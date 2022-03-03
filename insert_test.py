@@ -15,7 +15,10 @@ PORT="3306"
 DB="dbikes"
 USER ="TianyuHuang"
 engine =create_engine("mysql+mysqldb://{}:{}@{}:{}/{}".format(USER,PASSWORD,URL,PORT,DB),echo=True)
-
+APIKEY = "50b3e4b1972f05f68760a2caaece786ed0bda969"
+NAME = "Dublin"
+STATIONS_URL = "https://api.jcdecaux.com/vls/v1/stations?apiKey=50b3e4b1972f05f68760a2caaece786ed0bda969&contract=Dublin"
+r = requests.get(STATIONS_URL, params={"apiKey": APIKEY,"contract": NAME})
 def main():
     while True:
         try:
@@ -24,7 +27,7 @@ def main():
             print(r,now)
             write_to_file(r.text)
             write_to_db(r.text)
-            time.sleep(8*60)
+            time.sleep(5*60)
         except:
             print(traceback.format_exc())
             if engine is None:return
@@ -34,13 +37,7 @@ def stations_to_db(text):
     print(type(stations),len(stations))
     for station in stations: 
         print(station)
-        vals=(station.get('address'),int(station.get('banking')),
-station.get('bike stands'),int(station.get('bonus')),
-                        station.get('contract name'), station.get('name'),
-station.get('number'),
-                        station.get('position').get('lat'),
-station.get('position').get('lng'),station.get('status')
-)
+        vals=(station.get('address'),int(station.get('banking')),station.get('bike stands'),int(station.get('bonus')),station.get('contract name'), station.get('name'),station.get('number'),station.get('position').get('lat'),station.get('position').get('lng'),station.get('status'))
         engine.execute("insert into station values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",vals)
         break
     return
