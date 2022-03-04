@@ -73,7 +73,6 @@ def stations_to_db(text):
             station.get('position').get('lat'), station.get('position').get('lng'), station.get('status')
         )
         engine.execute("insert into station values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",vals)
-        break
     return
 
 
@@ -84,6 +83,6 @@ while True:
         print(r, now)
         write_to_file(r.text)
         stations_to_db(r.text)
-        time.sleep(5*60)
+        time.sleep(8*60)
     except:
         print(traceback.format_exc())
