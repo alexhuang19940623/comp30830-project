@@ -10,9 +10,8 @@ import requests
 import traceback
 import datetime
 import time
-KEY = "50b3e4b1972f05f68760a2caaece786ed0bda969"
-NAME = "Dublin"
-STATIONS = "https://api.jcdecaux.com/vls/v1/stations"
+import cryptography
+from keys import *
 
 engine = create_engine("mysql+pymysql://root:no104349@localhost:3306",echo=True)
 sql = """
@@ -32,7 +31,7 @@ sql2 = """
         temperture VARCHAR(256),
         pressure VARCHAR(256),
         humidity VARCHAR(256),
-        visibility VARCHAR(256),
+        visibility VARCHAR(256)
 	);
 """
 try:
@@ -44,3 +43,27 @@ except Exception as e:
     print(e)
 
 
+def weather_to_db(text):
+    d_weather = json.loads(text)
+    vals = (
+        d_weather['dt'],d_weather['weather'][0]['description'],d_weather['weather'][0]['icon'],
+        d_weather['main']['temp'], d_weather['main']['pressure'],d_weather['main']['humidity'],
+        d_weather['visibility']
+    )
+    print(vals)
+    engine.execute("insert into weather values(%s, %s, %s, %s, %s, %s, %s)",vals)
+    return
+
+
+KEY = "2150ca8b3c3f0f799010b1403ca77a5d"
+WEATHER = "https://api.openweathermap.org/data/2.5/weather"
+# while True:
+try:
+    p = "weather/"
+    path_list = os.listdir(p)
+    for i in range(len(path_list)):
+        text = open(p + path_list[i] ,'r').read()
+        weather_to_db(text)
+    # time.sleep(60*60)
+except:
+    print(traceback.format_exc())

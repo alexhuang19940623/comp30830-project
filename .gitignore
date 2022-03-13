@@ -12,7 +12,8 @@
 /build
 # data
 /Database/data
-
+#key
+keys.py
 # misc
 .DS_Store
 .env.local
