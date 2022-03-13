@@ -58,10 +58,21 @@ except Exception as e:
     print(e)
 
 def write_to_file(text):
-    f = open("bikes__{}".format(now).replace(" ", "_").replace(":", "=").replace(".", ","), "w")
+    f = open("data/bikes/bikes__{}".format(now).replace(" ", "_").replace(":", "=").replace(".", ","), "w")
     f.write(r.text)
     f.close()
 
+def avail_bikes_to_db(text):
+    avail_bikes = json.loads(text)
+    print(type(avail_bikes), len(avail_bikes))
+    for station in avail_bikes:
+        print(station)
+        vals = (
+            int(station.get('number')), int(station.get('available_bikes')), int(station.get('available_bike_stands')),
+            int(station.get('last_update')),
+        )
+        engine.execute("insert into station values(%s, %s, %s, %s)",vals)
+    return
 
 def stations_to_db(text):
     stations = json.loads(text)
@@ -81,8 +92,9 @@ while True:
     try:
         now = datetime.datetime.now()
         r = requests.get(STATIONS, params={"apiKey": KEY, "contract": NAME})
-        print(r, now)
+        # print(r, now)
         write_to_file(r.text)
+        avail_bikes_to_db(r.text)
         stations_to_db(r.text)
         time.sleep(8*60)
     except:
