@@ -10,14 +10,14 @@ import requests
 import traceback
 import datetime
 import time
-# from keys import *
+from keys import *
 
 URL="database-1.cyhnb62nmtav.eu-west-1.rds.amazonaws.com"
-PASSWORD="11223344"
+PASSWORD=db_pw
 PORT="3306"
 USER ="kuroko"
 
-engine = create_engine("mysql+mysqldb://{}:{}@{}:{}".format(USER,PASSWORD,URL,PORT),echo=True)
+engine = create_engine("mysql+pymysql://{}:{}@{}:{}".format(USER,PASSWORD,URL,PORT),echo=True)
 
 # engine = create_engine("mysql+pymysql://root:no104349@localhost:3306",echo=True)
 
@@ -50,25 +50,21 @@ except Exception as e:
     print(e)
 
 
-# def weather_to_db(text):
-#     d_weather = json.loads(text)
-#     vals = (
-#         d_weather['dt'],d_weather['weather'][0]['description'],d_weather['weather'][0]['icon'],
-#         d_weather['main']['temp'], d_weather['main']['pressure'],d_weather['main']['humidity'],
-#         d_weather['visibility']
-#     )
-#     print(vals)
-#     engine.execute("insert into weather values(%s, %s, %s, %s, %s, %s, %s)",vals)
-#     return
+def weather_to_db(text):
+    d_weather = json.loads(text)
+    vals = (
+        d_weather['dt'],d_weather['weather'][0]['description'],d_weather['weather'][0]['icon'],
+        d_weather['main']['temp'], d_weather['main']['pressure'],d_weather['main']['humidity'],
+        d_weather['visibility']
+    )
+    print(vals)
+    engine.execute("insert into weather values(%s, %s, %s, %s, %s, %s, %s)",vals)
+    return
 
 
-# while True:
-# try:
-#     p = "data/weather/"
-#     path_list = os.listdir(p)
-#     for i in range(len(path_list)):
-#         text = open(p + path_list[i] ,'r').read()
-#         weather_to_db(text)
-#     # time.sleep(60*60)
-# except:
-#     print(traceback.format_exc())
+p = "data/weather/"
+if(os.path.exists(p)):
+    path_list = os.listdir(p)
+    for i in range(len(path_list)):
+        text = open(p + path_list[i] ,'r').read()
+        weather_to_db(text)

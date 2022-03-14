@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import sqlalchemy as sqla
 from sqlalchemy import create_engine
 import traceback
@@ -12,9 +11,6 @@ import traceback
 import datetime
 import time
 from keys import *
-KEY = bike_key
-NAME = "Dublin"
-STATIONS = "https://api.jcdecaux.com/vls/v1/stations"
 
 URL="database-1.cyhnb62nmtav.eu-west-1.rds.amazonaws.com"
 PASSWORD=db_pw
@@ -34,7 +30,38 @@ sql1 = """
 use dbbikes;
 
 """
-engine.execute(sql1)
+sql2 = """
+    CREATE TABLE IF NOT EXISTS station(
+        address VARCHAR(256),
+        banking INTEGER,
+        bike_stands INTEGER,
+        bonus INTEGER,
+        contract_name VARCHAR(256),
+        name VARCHAR(256),
+        number INTEGER,
+        position_lat REAL,
+        position_lng REAL,
+        status VARCHAR(256)
+	);
+"""
+sql3 = """
+    CREATE TABLE IF NOT EXISTS availability(
+        number VARCHAR(256),
+        available_bikes VARCHAR(256),
+        available_bike_stands VARCHAR(256),
+        last_update VARCHAR(256)
+	);
+"""
+try:
+    res = engine.execute(sql1)
+    res = engine.execute("DROP TABLE IF EXISTS stations")
+    res = engine.execute("DROP TABLE IF EXISTS availability")
+    res = engine.execute(sql2)
+    res = engine.execute(sql3)
+    print(res.fetchall())
+except Exception as e:
+    print(e)
+
 
 
 def stations_to_db(text):
@@ -50,7 +77,6 @@ def stations_to_db(text):
         engine.execute("insert into station values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",vals)
     return
 
-
 def avail_bikes_to_db(text):
     avail_bikes = json.loads(text)
     print(type(avail_bikes), len(avail_bikes))
@@ -63,19 +89,10 @@ def avail_bikes_to_db(text):
         engine.execute("insert into availability values(%s, %s, %s, %s)",vals)
     return
 
-def write_to_file(text):
-    f = open("data/bikes/bikes__{}".format(now).replace(" ", "_"), "w")
-    f.write(r.text)
-    f.close()
-
-while True:
-    try:
-        now = datetime.datetime.now()
-        r = requests.get(STATIONS, params={"apiKey": KEY, "contract": NAME})
-        # print(r, now)
-        write_to_file(r.text)
-        avail_bikes_to_db(r.text)
-        stations_to_db(r.text)
-        time.sleep(8*60)
-    except:
-        print(traceback.format_exc())
+p = "data/bikes/"
+if(os.path.exists(p)):
+    path_list = os.listdir(p)
+    for i in range(len(path_list)):
+        text = open(p + path_list[i] ,'r').read()
+        stations_to_db(text)
+        avail_bikes_to_db(text)

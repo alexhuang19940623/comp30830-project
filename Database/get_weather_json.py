@@ -10,26 +10,31 @@ import requests
 import traceback
 import datetime
 import time
-import cryptography
 from keys import *
+
+URL="database-1.cyhnb62nmtav.eu-west-1.rds.amazonaws.com"
+PASSWORD=db_pw
+PORT="3306"
+USER ="kuroko"
 KEY = weather_key
 WEATHER = "https://api.openweathermap.org/data/2.5/weather"
 
-engine = create_engine("mysql+pymysql://root:no104349@localhost:3306",echo=True)
+
+engine = create_engine("mysql+pymysql://{}:{}@{}:{}".format(USER,PASSWORD,URL,PORT),echo=True)
+
+# engine = create_engine("mysql+pymysql://root:no104349@localhost:3306",echo=True)
+
 sql = """
-    CREATE DATABASE IF NOT EXISTS dbikes;
+    CREATE DATABASE IF NOT EXISTS dbbikes;
 """
 engine.execute(sql)
 
 sql1 = """
-use dbikes;
+use dbbikes;
 
 """
-try:
-    res = engine.execute(sql1)
-    print(res.fetchall())
-except Exception as e:
-    print(e)
+engine.execute(sql1)
+
 
 def write_to_file(text):
     f = open("data/weather/weather__{}".format(now).replace(" ", "_"), "w")
@@ -39,8 +44,6 @@ def write_to_file(text):
 
 def weather_to_db(text):
     d_weather = json.loads(text)
-    # print('**************')
-    # print(d_weather)
     vals = (
         d_weather['dt'],d_weather['weather'][0]['description'],d_weather['weather'][0]['icon'],
         d_weather['main']['temp'], d_weather['main']['pressure'],d_weather['main']['humidity'],
@@ -51,14 +54,14 @@ def weather_to_db(text):
     return
 
 
-# while True:
-try:
-    now = datetime.datetime.now()
-    lat = 53.343897
-    lon = -6.29706
-    r = requests.get(WEATHER, params={"lat": lat, "lon": lon,"appid": KEY})
-    write_to_file(r.text)
-    weather_to_db(r.text)
-    # time.sleep(60*60)
-except:
-    print(traceback.format_exc())
+while True:
+    try:
+        now = datetime.datetime.now()
+        lat = 53.343897
+        lon = -6.29706
+        r = requests.get(WEATHER, params={"lat": lat, "lon": lon,"appid": KEY})
+        write_to_file(r.text)
+        weather_to_db(r.text)
+        time.sleep(60*60)
+    except:
+        print(traceback.format_exc())
