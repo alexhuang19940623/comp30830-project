@@ -10,7 +10,6 @@ import requests
 import traceback
 import datetime
 import time
-import cryptography
 # from keys import *
 
 URL="database-1.cyhnb62nmtav.eu-west-1.rds.amazonaws.com"
@@ -18,7 +17,7 @@ PASSWORD="11223344"
 PORT="3306"
 USER ="kuroko"
 
-engine = create_engine("mysql+mysqldb://{}:{}@{}:{}".format(USER,PASSWORD,URL,PORT,DB),echo=True)
+engine = create_engine("mysql+mysqldb://{}:{}@{}:{}".format(USER,PASSWORD,URL,PORT),echo=True)
 
 # engine = create_engine("mysql+pymysql://root:no104349@localhost:3306",echo=True)
 
