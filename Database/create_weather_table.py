@@ -11,16 +11,24 @@ import traceback
 import datetime
 import time
 import cryptography
-from keys import *
+# from keys import *
 
-engine = create_engine("mysql+pymysql://root:no104349@localhost:3306",echo=True)
+URL="database-1.cyhnb62nmtav.eu-west-1.rds.amazonaws.com"
+PASSWORD="11223344"
+PORT="3306"
+USER ="kuroko"
+
+engine = create_engine("mysql+mysqldb://{}:{}@{}:{}".format(USER,PASSWORD,URL,PORT,DB),echo=True)
+
+# engine = create_engine("mysql+pymysql://root:no104349@localhost:3306",echo=True)
+
 sql = """
-    CREATE DATABASE IF NOT EXISTS dbikes;
+    CREATE DATABASE IF NOT EXISTS dbbikes;
 """
 engine.execute(sql)
 
 sql1 = """
-use dbikes;
+use dbbikes;
 
 """
 sql2 = """
@@ -55,15 +63,13 @@ def weather_to_db(text):
     return
 
 
-KEY = "2150ca8b3c3f0f799010b1403ca77a5d"
-WEATHER = "https://api.openweathermap.org/data/2.5/weather"
 # while True:
-try:
-    p = "weather/"
-    path_list = os.listdir(p)
-    for i in range(len(path_list)):
-        text = open(p + path_list[i] ,'r').read()
-        weather_to_db(text)
-    # time.sleep(60*60)
-except:
-    print(traceback.format_exc())
+# try:
+#     p = "data/weather/"
+#     path_list = os.listdir(p)
+#     for i in range(len(path_list)):
+#         text = open(p + path_list[i] ,'r').read()
+#         weather_to_db(text)
+#     # time.sleep(60*60)
+# except:
+#     print(traceback.format_exc())
