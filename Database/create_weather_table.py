@@ -51,16 +51,16 @@ except Exception as e:
     print(e)
 
 
-def weather_to_db(text):
-    d_weather = json.loads(text)
-    vals = (
-        d_weather['dt'],d_weather['weather'][0]['description'],d_weather['weather'][0]['icon'],
-        d_weather['main']['temp'], d_weather['main']['pressure'],d_weather['main']['humidity'],
-        d_weather['visibility']
-    )
-    print(vals)
-    engine.execute("insert into weather values(%s, %s, %s, %s, %s, %s, %s)",vals)
-    return
+# def weather_to_db(text):
+#     d_weather = json.loads(text)
+#     vals = (
+#         d_weather['dt'],d_weather['weather'][0]['description'],d_weather['weather'][0]['icon'],
+#         d_weather['main']['temp'], d_weather['main']['pressure'],d_weather['main']['humidity'],
+#         d_weather['visibility']
+#     )
+#     print(vals)
+#     engine.execute("insert into weather values(%s, %s, %s, %s, %s, %s, %s)",vals)
+#     return
 
 
 # while True:
