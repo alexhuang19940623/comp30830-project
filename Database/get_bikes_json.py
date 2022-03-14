@@ -15,7 +15,7 @@ from keys import *
 KEY = bike_key
 NAME = "Dublin"
 STATIONS = "https://api.jcdecaux.com/vls/v1/stations"
-
+# url
 URL="database-1.cyhnb62nmtav.eu-west-1.rds.amazonaws.com"
 PASSWORD=db_pw
 PORT="3306"
