@@ -6,8 +6,9 @@ import pandas as pd
 import requests
 import datetime
 from datetime import date
+from keys import *
 URL="database-1.cyhnb62nmtav.eu-west-1.rds.amazonaws.com"
-PASSWORD="11223344"
+PASSWORD=db_pw
 PORT="3306"
 USER ="kuroko"
 
