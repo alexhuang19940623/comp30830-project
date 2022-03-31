@@ -62,7 +62,7 @@ def get_stations():
 def get_station(station_id):
     engine = get_db()
     data = []
-    rows = engine.execute("SELECT * from availability where number = {} limit 24;".format(station_id))
+    rows = engine.execute("SELECT * FROM dbbikes.availability  where number = {} order by last_update desc limit 24;".format(station_id))
     for row in rows:
         data.append(dict(row))
     
@@ -73,3 +73,6 @@ def get_station(station_id):
 @app.route('/register/')
 def register():
     return render_template("register.html")
+
+# @app.route('/chartDataframe/<int:station_id>/<string:date>')
+# def chartDataframe(station_id):

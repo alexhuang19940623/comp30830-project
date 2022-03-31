@@ -20,24 +20,17 @@
       <a href = "http://www.dublinbikes.ie/" target="_blank"><img src="https://vignette.wikia.nocookie.net/logopedia/images/7/74/Dublinbikes.svg/revision/latest?cb=20140625224430" style="width:100px;height:55px;position:absolute;right:20%;top:0px;"></a>
     </div>
     <div id="map"></div>
+    <div id="extraStationInfo"></div>
+    <div id="curve_chart" style="width: 900px; height: 500px;" ></div>
+    <button id="toggle-heatmap"></button>
+
+    
     <script type="text/javascript">
 
       var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
 
     </script>
 
-    <!-- <script type="text/javascript">
-      function addButtons(stat_id){
-        buttons = "<b>Average Occupancy: </b><button type=\"button\" onclick = \"getDataframe(" + stat_id + ", 1)\">Monday</button><button type=\"button\" onclick = \"getDataframe(" + stat_id + ", 2)\">Tuesday</button><button type=\"button\" onclick = \"getDataframe(" + stat_id + ", 3)\">Wednesday</button><button type=\"button\" onclick = \"getDataframe(" + stat_id + ", 4)\">Thursday</button><button type=\"button\" onclick = \"getDataframe(" + stat_id + ", 5)\">Friday</button><button type=\"button\" onclick = \"getDataframe(" + stat_id + ", 6)\">Saturday</button><button type=\"button\" onclick = \"getDataframe(" + stat_id + ", 0)\">Sunday</button>";
-        document.getElementById("buttons").innerHTML = buttons;
-      // } 
-      function getDataframe(num,day) {
-        google.charts.load('current', {packages: ['corechart', 'line']});
-        google.charts.setOnLoadCallback(drawBasic);
-        var numb = num;
-        var d;
-      }
-    </script> -->
 
     <script>
       infoArray = []
@@ -51,7 +44,27 @@
                   const map = new google.maps.Map(document.getElementById("map"), {
                       zoom: 13,
                       center: center,
+                      mapTypeId: "satellite",
                   });
+                  const heatmap = new google.maps.visualization.HeatmapLayer({
+                    data: getPoints(),
+                    map: map,
+                  });
+                  document
+                  .getElementById("toggle-heatmap")
+                  .addEventListener("click", toggleHeatmap);
+                  function toggleHeatmap() {
+                    heatmap.setMap(heatmap.getMap() ? null : map);
+                  }
+                  function getPoints(){
+                    return [
+                      new google.maps.LatLng(53.349562, -6.278198),
+                      new google.maps.LatLng(53.349562, -6.278198),
+                      new google.maps.LatLng(53.349562, -6.278198),
+                      new google.maps.LatLng(53.349562, -6.278198),
+                      new google.maps.LatLng(53.349562, -6.278198),
+                    ]
+                  };
                   // The marker, positioned at Dublin
                   marks=[];
                   for(var i = 0; i < bikes.length;i++){
@@ -72,28 +85,114 @@
                           infoArray.push(infowindow);
                           var jqxhr_avail = $.getJSON($SCRIPT_ROOT + "/available/" + bikes[i]['number'], function(data) {
                               var avai_bikes = data.available;
-                              console.log(avai_bikes);
+                              
+                              times_Str = []
+                              chart_array = []
+                              for(var i = 0; i < avai_bikes.length; i ++){
+                                // time string
+                                var timestamp4 = new Date(parseInt(avai_bikes[i]['last_update']))
+                                let time_Str=timestamp4.getFullYear() + '-' + (timestamp4.getMonth() + 1) + '-' + timestamp4.getDate() + ' ' + 
+                                timestamp4.getHours() + ':' + 
+                                timestamp4.getMinutes() + ':' + 
+                                timestamp4.getSeconds();
+                                times_Str.unshift(time_Str);
+                                // chart string
+                                temp = [timestamp4.getHours() + ':' + timestamp4.getMinutes(), avai_bikes[i]['available_bikes'], avai_bikes[i]['available_bike_stands']];
+                                chart_array.unshift(temp)
+                              }
+                              times_Str.reverse();
+                              // console.log(times_Str);
+                              // console.log(avai_bikes);
                               /* Creates information box including bike and stand availability with the option for more info. The more info button will display a graph of the average occupancy for that station for the current day. For example if the web page is loaded on a monday, all info buttons will return plot a graph of the average occupancy for a full monday. The realtime data is updated every 5 minutes to ensure the user sees regularly up to date info.*/
                               contentString = '<div id = "content"><h3>' + bikes[i]['name'] + '</h3></div>' + 
                               '<div id="station_availability"><h3>Bikes available: ' 
-                                + avai_bikes[i]['available_bikes'] + '<br> Stands available: ' 
-                                + avai_bikes[i]['available_bike_stands'] + '</h3><button type="button" onclick = "getDataframe(' 
-                                + avai_bikes[i]['number'] 
-                                + ',' + new Date().getDay() + ');addButtons('+ bikes[i]['number'] 
-                                + ')">More Info</button></div>';
+                                + avai_bikes[0]['available_bikes'] + '<br> Stands available: ' 
+                                + avai_bikes[0]['available_bike_stands'] + '<br> Last update time: '
+                                + times_Str[0]+'</h3><button type="button" onclick = \"showChart(\''+avai_bikes[0]['number']+'\')\">More Info</button></div>';
                               infowindow.setContent(contentString);
                               infowindow.open(map, marker);
                           })
-                          
-
                       });
                 }
           })
         }
+      
     </script>
+
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+            function showChart(id){
+              google.charts.load('current', {'packages':['corechart']});
+              google.charts.setOnLoadCallback(()=>{
+              drawChart(id)
+
+              });
+            }
+            
+              function drawChart(id) {
+
+                var jqxhr_avail = $.getJSON($SCRIPT_ROOT + "/available/" + id, function(json) {
+
+                  var avai_bikes = json.available;
+                  chart_array = [];
+                  for(var i = 0; i < avai_bikes.length; i ++){
+                    // chart string
+                    var timestamp4 = new Date(parseInt(avai_bikes[i]['last_update']))
+                    // let s = timestamp4.getHours +':'+timestamp4.getMinutes;
+                    temp = [timestamp4,parseInt(avai_bikes[i]['available_bikes']),parseInt(avai_bikes[i]['available_bike_stands'])];
+                    chart_array.unshift(temp)
+                  }
+                  extra = "<p>Station ID: " + id +  "</p>";
+                  document.getElementById("extraStationInfo").innerHTML = extra;
+                    // // for(var i )
+
+                    
+                    // var temp = chart_array.split(',');
+                    // chart_array = [["Team", {type: 'date', label: 'Season Start Date'}, {type: 'date', label: 'Season End Date'}]]
+                    // for(var i = 0; i < temp.length; i ++){
+                    //   if(i % 3 == 0){
+                    //     a = []
+                    //     a.unshift(temp[i]);
+                    //   }
+                    //   if(i % 3 == 1){
+                    //     a.unshift(parseInt(temp[i]));
+                    //   }
+                    //   if(i % 3 == 2){
+                    //     a.unshift(parseInt(temp[i]));
+                    //     chart_array.unshift(a.reverse());
+                    //   }
+                    // }
+                  console.log(chart_array);
+                  var dataC = new google.visualization.DataTable();
+                  dataC.addColumn('date', 'time');
+                  dataC.addColumn('number', 'available_bikes');
+                  dataC.addColumn('number', 'available_bike_stands');
+                  dataC.addRows(chart_array);
+                  var options = {
+                      title: 'available bikes and stands in this station',
+                      width: 900,
+                      height: 500,
+                      hAxis: {
+                        // format: 'M/d/yy',
+                        gridlines: {count: 24}
+                      },
+                      vAxis: {
+                        gridlines: {color: 'none'},
+                        minValue: 0
+                      }
+                  };
+                  var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
+                  chart.draw(dataC, options);
+                
+              })
+
+              
+            }
+    </script>
+
     <!-- Async script executes immediately and must be after any DOM elements used in callback.-->
     <script
-    src="https://maps.googleapis.com/maps/api/js?key=kkkkkkkkkkkk&callback=initMap&libraries=&v=weekly";
+    src="https://maps.googleapis.com/maps/api/js?key=###########&callback=initMap&libraries=visualization&v=weekly";
       async
     ></script>
   </body>
