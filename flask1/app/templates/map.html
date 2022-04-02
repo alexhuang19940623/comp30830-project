@@ -18,20 +18,18 @@
     <div id="header">
       <h1>Real-time Dublin Bike Information</h1>
       <a href = "http://www.dublinbikes.ie/" target="_blank"><img src="https://vignette.wikia.nocookie.net/logopedia/images/7/74/Dublinbikes.svg/revision/latest?cb=20140625224430" style="width:100px;height:55px;position:absolute;right:20%;top:0px;"></a>
-    </div>
+    </div>  
+    <div id="weatherDiv"></div>  
+    <button id="toggle-heatmap">heatmap</button>
     <div id="map"></div>
+
     <div id="extraStationInfo"></div>
     <div id="curve_chart" style="width: 900px; height: 500px;" ></div>
-    <button id="toggle-heatmap"></button>
-
-    
     <script type="text/javascript">
 
       var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
 
     </script>
-
-
     <script>
       infoArray = []
       function initMap() {
@@ -44,36 +42,59 @@
                   const map = new google.maps.Map(document.getElementById("map"), {
                       zoom: 13,
                       center: center,
-                      mapTypeId: "satellite",
                   });
-                  const heatmap = new google.maps.visualization.HeatmapLayer({
-                    data: getPoints(),
-                    map: map,
-                  });
-                  document
-                  .getElementById("toggle-heatmap")
-                  .addEventListener("click", toggleHeatmap);
-                  function toggleHeatmap() {
-                    heatmap.setMap(heatmap.getMap() ? null : map);
+                  Locations = {}
+                  for(var i = 0; i < bikes.length;i++){
+                    l = [bikes[i]['position_lat'], bikes[i]['position_lng']];
+                    Locations[bikes[i]['number']] = l;
                   }
-                  function getPoints(){
-                    return [
-                      new google.maps.LatLng(53.349562, -6.278198),
-                      new google.maps.LatLng(53.349562, -6.278198),
-                      new google.maps.LatLng(53.349562, -6.278198),
-                      new google.maps.LatLng(53.349562, -6.278198),
-                      new google.maps.LatLng(53.349562, -6.278198),
-                    ]
-                  };
+                  // console.log(Locations);
+                  var xhr = $.getJSON($SCRIPT_ROOT + "/now_available", function(data) {
+                    res = [];
+                    var a_bikes = data.available;
+                    // console.log(a_bikes);
+                    a_bikes.forEach(element => {
+                      id = element['number']
+                      temp = element['available_bikes'];
+                      res.push(
+                        {
+                          location: new google.maps.LatLng(Locations[id][0], Locations[id][1]),
+                          weight: temp
+                        }
+                      )
+                    });
+                    const heatmap = new google.maps.visualization.HeatmapLayer({
+                      data: getPoints(),
+                      map: map,
+                    });
+                    heatmap.set('radius', 40);
+                    document
+                    .getElementById("toggle-heatmap")
+                    .addEventListener("click", toggleHeatmap);
+                    function toggleHeatmap() {
+                      heatmap.setMap(heatmap.getMap() ? null : map);
+                    }
+                    function getPoints(){
+                      return res; 
+                    };
+                  }).fail(()=>{
+                    //输入函数体
+                    console.log("failed!");
+                  })
+
+
+
+
                   // The marker, positioned at Dublin
                   marks=[];
                   for(var i = 0; i < bikes.length;i++){
-                      console.log(bikes[i]);
+                      // console.log(bikes[i]);
                       const marker = new google.maps.Marker({
                           position: {lat: bikes[i]['position_lat'], lng: bikes[i]['position_lng']},
                           map: map,
                           title : bikes[i]['name'],
                           station_number : bikes[i]['number'],
+                          status: bikes[i]['status']
                       });
                       marks.unshift(marker);
                       //When a marker is clicked, close the other infowindow before opening the new one
@@ -83,7 +104,7 @@
                           }
                           var infowindow = new google.maps.InfoWindow();
                           infoArray.push(infowindow);
-                          var jqxhr_avail = $.getJSON($SCRIPT_ROOT + "/available/" + bikes[i]['number'], function(data) {
+                          var jqxhr_avail = $.getJSON($SCRIPT_ROOT + "/available/" + marker.station_number, function(data) {
                               var avai_bikes = data.available;
                               
                               times_Str = []
@@ -104,9 +125,10 @@
                               // console.log(times_Str);
                               // console.log(avai_bikes);
                               /* Creates information box including bike and stand availability with the option for more info. The more info button will display a graph of the average occupancy for that station for the current day. For example if the web page is loaded on a monday, all info buttons will return plot a graph of the average occupancy for a full monday. The realtime data is updated every 5 minutes to ensure the user sees regularly up to date info.*/
-                              contentString = '<div id = "content"><h3>' + bikes[i]['name'] + '</h3></div>' + 
+                              contentString = '<div id = "content"><h3>' + marker.title + '</h3></div>' + 
                               '<div id="station_availability"><h3>Bikes available: ' 
-                                + avai_bikes[0]['available_bikes'] + '<br> Stands available: ' 
+                                + avai_bikes[0]['available_bikes'] + "<br> Status: "
+                                + marker.status+ '<br> Stands available: ' 
                                 + avai_bikes[0]['available_bike_stands'] + '<br> Last update time: '
                                 + times_Str[0]+'</h3><button type="button" onclick = \"showChart(\''+avai_bikes[0]['number']+'\')\">More Info</button></div>';
                               infowindow.setContent(contentString);
@@ -116,7 +138,22 @@
                 }
           })
         }
-      
+      var jqweather = $.getJSON($SCRIPT_ROOT + "/weather", function(data) {
+              weather = data["weather"][0];
+              console.log(weather);
+              var description = weather.description;
+              var last_up = new Date(parseInt(weather.dt)*1000);
+              var time = new Date(Date.now())
+              var humidity = weather.humidity;
+              var temperture = (parseInt(weather.temperture) - 273.15).toFixed(2);
+              var visibility = weather.visibility;
+              var icon = "http://openweathermap.org/img/w/" + weather.icon + ".png";
+              document.getElementById("weatherDiv").innerHTML = "<h2>" + description + "</h2><div id = \"icon\"><img src=" + icon +
+                " style = \"float: left;margin-left: 15px;\">" + time +"</div><div id = \"temp\"><br/><b>Temperture: </b>" + temperture + 
+                  "°C <b>    Humidity: </b>"+ humidity + 
+                  "% <b>    Visibility: </b>" + visibility +
+                  "m </div>";
+          })
     </script>
 
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -129,70 +166,68 @@
               });
             }
             
-              function drawChart(id) {
+            function drawChart(id) {
 
-                var jqxhr_avail = $.getJSON($SCRIPT_ROOT + "/available/" + id, function(json) {
+              var jqxhr_avail = $.getJSON($SCRIPT_ROOT + "/available/" + id, function(json) {
 
-                  var avai_bikes = json.available;
-                  chart_array = [];
-                  for(var i = 0; i < avai_bikes.length; i ++){
-                    // chart string
-                    var timestamp4 = new Date(parseInt(avai_bikes[i]['last_update']))
-                    // let s = timestamp4.getHours +':'+timestamp4.getMinutes;
-                    temp = [timestamp4,parseInt(avai_bikes[i]['available_bikes']),parseInt(avai_bikes[i]['available_bike_stands'])];
-                    chart_array.unshift(temp)
-                  }
-                  extra = "<p>Station ID: " + id +  "</p>";
-                  document.getElementById("extraStationInfo").innerHTML = extra;
-                    // // for(var i )
-
-                    
-                    // var temp = chart_array.split(',');
-                    // chart_array = [["Team", {type: 'date', label: 'Season Start Date'}, {type: 'date', label: 'Season End Date'}]]
-                    // for(var i = 0; i < temp.length; i ++){
-                    //   if(i % 3 == 0){
-                    //     a = []
-                    //     a.unshift(temp[i]);
-                    //   }
-                    //   if(i % 3 == 1){
-                    //     a.unshift(parseInt(temp[i]));
-                    //   }
-                    //   if(i % 3 == 2){
-                    //     a.unshift(parseInt(temp[i]));
-                    //     chart_array.unshift(a.reverse());
-                    //   }
-                    // }
-                  console.log(chart_array);
-                  var dataC = new google.visualization.DataTable();
-                  dataC.addColumn('date', 'time');
-                  dataC.addColumn('number', 'available_bikes');
-                  dataC.addColumn('number', 'available_bike_stands');
-                  dataC.addRows(chart_array);
-                  var options = {
-                      title: 'available bikes and stands in this station',
-                      width: 900,
-                      height: 500,
-                      hAxis: {
-                        // format: 'M/d/yy',
-                        gridlines: {count: 24}
-                      },
-                      vAxis: {
-                        gridlines: {color: 'none'},
-                        minValue: 0
-                      }
-                  };
-                  var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
-                  chart.draw(dataC, options);
-                
-              })
-
+                var avai_bikes = json.available;
+                chart_array = [];
+                for(var i = 0; i < avai_bikes.length; i ++){
+                  // chart string
+                  var timestamp4 = new Date(parseInt(avai_bikes[i]['last_update']))
+                  // let s = timestamp4.getHours +':'+timestamp4.getMinutes;
+                  temp = [timestamp4,parseInt(avai_bikes[i]['available_bikes']),parseInt(avai_bikes[i]['available_bike_stands'])];
+                  chart_array.unshift(temp)
+                }
+                extra = "<p>Station ID: " + id +  "</p>";
+                document.getElementById("extraStationInfo").innerHTML = extra;
               
+                // console.log(chart_array);
+                var dataC = new google.visualization.DataTable();
+                dataC.addColumn('date', 'time');
+                dataC.addColumn('number', 'available_bikes');
+                dataC.addColumn('number', 'available_bike_stands');
+                dataC.addRows(chart_array);
+                var options = {
+                    title: 'available bikes and stands in this station',
+                    width: 900,
+                    height: 500,
+                    hAxis: {
+                      // format: 'M/d/yy',
+                      gridlines: {count: 24}
+                    },
+                    vAxis: {
+                      gridlines: {color: 'none'},
+                      minValue: 0
+                    }
+                };
+                var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
+                chart.draw(dataC, options);
+              
+            })
+
+            
+          }
+
+            function show_weather(weather){
+              // console.log(weather);
+              var weatherInfo = weather[0];
+              var time = new Date(parseInt(weather.dt));
+              var humidity = weather.humidity;
+              var temperture = parseInt(weather.temperture) - 273.15;
+              var visibility = weather.visibility;
+              var icon = "http://openweathermap.org/img/w/" + weather.icon + ".png";
+              document.getElementById("weatherDiv").innerHTML = "<h2>" + time + "</h2><div id = \"icon\"><img src=" + icon +
+                " style = \"float: left;margin-left: 15px;\">" + weatherInfo +"</div><div id = \"temp\"><br/><b>Temperture: </b>" + temperture + 
+                  "°C<br/></div></div>";
             }
+
+
     </script>
 
     <!-- Async script executes immediately and must be after any DOM elements used in callback.-->
     <script
-    src="https://maps.googleapis.com/maps/api/js?key=###########&callback=initMap&libraries=visualization&v=weekly";
+    src="https://maps.googleapis.com/maps/api/js?key=asfasdfasfdasdf&callback=initMap&libraries=visualization&v=weekly";
       async
     ></script>
   </body>

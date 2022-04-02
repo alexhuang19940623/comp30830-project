@@ -6,9 +6,8 @@ import pandas as pd
 import requests
 import datetime
 from datetime import date
-from keys import *
 URL="database-1.cyhnb62nmtav.eu-west-1.rds.amazonaws.com"
-PASSWORD=db_pw
+PASSWORD=wwwww
 PORT="3306"
 USER ="kuroko"
 
@@ -41,11 +40,21 @@ def map():
 @app.route("/weather")
 def query_weather():
     engine = get_db()
-    row = engine.execute("SELECT * from weather limit 1;")
-    row = dict(row)
+    res = []
+    rows = engine.execute("SELECT * from weather order by dt desc limit 1;")
+    for row in rows:
+        res.append(dict(row))
     
-    return jsonify(row = row)
+    return jsonify(weather = res)
 
+@app.route('/now_available')
+def get_now():
+    engine = get_db()
+    stations = []
+    rows = engine.execute("SELECT * from dbbikes.availability limit 110;")
+    for row in rows:
+        stations.append(dict(row))
+    return jsonify(available = stations)
 
 @app.route('/station')
 def get_stations():
