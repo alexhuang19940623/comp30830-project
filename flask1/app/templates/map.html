@@ -81,10 +81,6 @@
                     //输入函数体
                     console.log("failed!");
                   })
-
-
-
-
                   // The marker, positioned at Dublin
                   marks=[];
                   for(var i = 0; i < bikes.length;i++){
@@ -94,11 +90,13 @@
                           map: map,
                           title : bikes[i]['name'],
                           station_number : bikes[i]['number'],
-                          status: bikes[i]['status']
+                          status: bikes[i]['status'],
+                          icon: "/static/bikeicon.png" 
                       });
                       marks.unshift(marker);
                       //When a marker is clicked, close the other infowindow before opening the new one
                       google.maps.event.addListener(marker, 'click', function() {
+                          post_info(marker.station_number);
                           for (var i=0;i<infoArray.length;i++) {
                               infoArray[i].close();
                           }
@@ -153,7 +151,17 @@
                   "°C <b>    Humidity: </b>"+ humidity + 
                   "% <b>    Visibility: </b>" + visibility +
                   "m </div>";
-          })
+      })
+
+
+
+      
+
+
+
+
+
+
     </script>
 
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -222,12 +230,47 @@
                   "°C<br/></div></div>";
             }
 
+            // myPrediction(prediction_info_list);
 
+            // Trigger ML model and display result on HTML
+            function post_info(id){
+              var jqweather_predict = $.getJSON("https://api.openweathermap.org/data/2.5/onecall?lat=53.343897&lon=-6.278198&exclude=minutely,daily,current,alerts&appid=2150ca8b3c3f0f799010b1403ca77a5d", function(data){
+                weather_predict_list = data["hourly"]
+                for(var i = 0; i < weather_predict_list.length; i ++){
+                  var time = new Date(parseInt(weather_predict_list[i].dt)*1000).getDay() + 1;
+                  var number = id
+                  var hours = new Date(parseInt(weather_predict_list[i].dt)*1000).getHours()
+                  var temp = weather_predict_list[i]["temp"]
+                  var visibility = weather_predict_list[i]["visibility"]
+                  var description = weather_predict_list[i]["weather"][0]["description"]
+                  console.log(id,time,hours,temp,visibility,description);
+                  prediction_info_list = time + "," + number + "," + hours + "," + temp + "," + visibility + "," + description;
+                  myPrediction(prediction_info_list);
+                }
+              })
+            }
+
+            function myPrediction(prediction_info_list) {
+              $.getJSON($SCRIPT_ROOT + '/prediction_model', {post: prediction_info_list}, function(data) {
+                console.log(data);
+                // var response = data;
+                // var bikes = response[0];
+                // var stands = response[1];
+                // document.getElementById("prediction_title").innerHTML = "<h2>this station Predict bikes and stands</h2>"
+                // document.getElementById("prediction_bikes_stands").innerHTML = "<h3>bikes:"+bikes+"</h3>"+"<h3>stands:"+stands+"</h3>"
+                // document.getElementById("sourceTitle").innerHTML="Nearest stations to your source<br><span class='availableBrackets'>(Predicted available bikes)</span>";
+                // document.getElementById("sourceList").innerHTML="<span onclick=\"clickMarker('"+nearest_station+"')\">"+nearest_station+"</span> ("+bike_nearest_station+")<br><span onclick=\"clickMarker('"+second_nearest_station+"')\">"+second_nearest_station+"</span> ("+bike_available_2nd_nearest+")";
+              });
+            };
+
+
+
+            
     </script>
 
     <!-- Async script executes immediately and must be after any DOM elements used in callback.-->
     <script
-    src="https://maps.googleapis.com/maps/api/js?key=asfasdfasfdasdf&callback=initMap&libraries=visualization&v=weekly";
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAWssQsDRSjIdTwIHqpC18ToY4GzOis85Q&callback=initMap&libraries=visualization&v=weekly";
       async
     ></script>
   </body>

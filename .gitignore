@@ -14,6 +14,9 @@
 /Database/data
 #key
 keys.py
+final_prediction_bike_stands.pickle
+final_prediction.pickle
+
 # misc
 .DS_Store
 .env.local
