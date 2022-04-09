@@ -1,30 +1,43 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <style type="text/css">
-      /* Set the size of the div element that contains the map */
-      #map {
-        height: 400px;
-        /* The height is 400 pixels */
-        width: 100%;
-        /* The width is the width of the web page */
-      }
-    </style>
+    <link rel="stylesheet" href="/static/main.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
   </head>
   <body>
-    <h3>DublinBike Demo</h3>
+    <div id="bg">
+      <div id="header">
+        <h1 id="name">Real-time Dublin Bike Information</h1>
+        <a href = "http://www.dublinbikes.ie/" target="_blank"><img src="https://vignette.wikia.nocookie.net/logopedia/images/7/74/Dublinbikes.svg/revision/latest?cb=20140625224430" style="width:100px;height:55px;position:absolute;right:20%;top:0px;"></a>
+      </div>  
+      <div id="weatherDiv">
+        <table id="weather_tb">
+          <caption>Weather prediction table</caption>
+          <th></th>
+          <th>Description</th>
+          <th>Temperture</th>
+          <th>Humidity</th>
+          <th>Visibility</th>
+          <th>Time</th>
+          <tr id="weather_tr"></tr>
+        </table>
+        <span style="font-size: larger;">Weather prediction in next 48 hours: </span>
+        <select id="weather_prediction" onchange="selectChange()" style="display: inline-block;"></select>
+      </div>
+      <div id="heatmap">
+        <!-- <span style="position: absolute;left: 2%; font-size: larger;">heatmap on/off: </span> -->
+        <button id="toggle-heatmap" class="green">heatmap</button>
+      </div>
+  
+      <div id="map"></div>
+      <div id="chart">
+        <h3 id="extraStationInfo">Click the marker on the map, it will show Past infomation and Prediction infomation Chart </h3>
+        <div id="curve_chart" style="position:absolute;left:0;"></div>
+        <div id="predict_chart" style="position:absolute;right:15%"></div>
+      </div>
+    </div>
     <!--The div element for the map -->
-    <div id="header">
-      <h1>Real-time Dublin Bike Information</h1>
-      <a href = "http://www.dublinbikes.ie/" target="_blank"><img src="https://vignette.wikia.nocookie.net/logopedia/images/7/74/Dublinbikes.svg/revision/latest?cb=20140625224430" style="width:100px;height:55px;position:absolute;right:20%;top:0px;"></a>
-    </div>  
-    <div id="weatherDiv"></div>  
-    <button id="toggle-heatmap">heatmap</button>
-    <div id="map"></div>
-
-    <div id="extraStationInfo"></div>
-    <div id="curve_chart" style="width: 900px; height: 500px;" ></div>
+    
     <script type="text/javascript">
 
       var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
@@ -91,12 +104,14 @@
                           title : bikes[i]['name'],
                           station_number : bikes[i]['number'],
                           status: bikes[i]['status'],
-                          icon: "/static/bikeicon.png" 
+                          icon: "/static/bikeicon.png",
+                          bike_stands: bikes[i]['bike_stands']
                       });
                       marks.unshift(marker);
                       //When a marker is clicked, close the other infowindow before opening the new one
                       google.maps.event.addListener(marker, 'click', function() {
-                          post_info(marker.station_number);
+                          post_info(marker.station_number,marker.bike_stands);
+                          showChart(marker.station_number)
                           for (var i=0;i<infoArray.length;i++) {
                               infoArray[i].close();
                           }
@@ -128,7 +143,7 @@
                                 + avai_bikes[0]['available_bikes'] + "<br> Status: "
                                 + marker.status+ '<br> Stands available: ' 
                                 + avai_bikes[0]['available_bike_stands'] + '<br> Last update time: '
-                                + times_Str[0]+'</h3><button type="button" onclick = \"showChart(\''+avai_bikes[0]['number']+'\')\">More Info</button></div>';
+                                + times_Str[0]+'</h3></div>';
                               infowindow.setContent(contentString);
                               infowindow.open(map, marker);
                           })
@@ -146,22 +161,48 @@
               var temperture = (parseInt(weather.temperture) - 273.15).toFixed(2);
               var visibility = weather.visibility;
               var icon = "http://openweathermap.org/img/w/" + weather.icon + ".png";
-              document.getElementById("weatherDiv").innerHTML = "<h2>" + description + "</h2><div id = \"icon\"><img src=" + icon +
-                " style = \"float: left;margin-left: 15px;\">" + time +"</div><div id = \"temp\"><br/><b>Temperture: </b>" + temperture + 
-                  "°C <b>    Humidity: </b>"+ humidity + 
-                  "% <b>    Visibility: </b>" + visibility +
-                  "m </div>";
+              document.getElementById("weather_tr").innerHTML = ''
+              document.getElementById("weather_tr").innerHTML += '<td><img src=' + icon +
+                ' style = \"float: left;margin-left: 15px;\"></td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+description+'</td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+temperture+'°C </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+humidity+'% </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+visibility+'m </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+last_up+'</td>';
       })
 
 
 
+
+      var jqweather_predict = $.getJSON("https://api.openweathermap.org/data/2.5/onecall?lat=53.343897&lon=-6.278198&exclude=minutely,daily,current,alerts&appid=2150ca8b3c3f0f799010b1403ca77a5d", function(data){
+          weather_predict_list = data["hourly"]
+          var weather_prediction_div = document.getElementById("weather_prediction");
+          for(var i = 0; i < weather_predict_list.length; i ++){
+              var datetime = new Date(parseInt(weather_predict_list[i].dt)*1000)
+              var time = datetime.getDay() + 1;
+              // var number = id
+              var hours = datetime.getHours()
+              var temp = weather_predict_list[i]["temp"]
+              var visibility = weather_predict_list[i]["visibility"]
+              var description = weather_predict_list[i]["weather"][0]["description"]
+              var humidity = weather_predict_list[i]["humidity"]
+              var icon = "http://openweathermap.org/img/w/" + weather_predict_list[i]["weather"][0]["icon"] + ".png";
+              // console.log(id,time,hours,temp,visibility,description);
+              // prediction_info_list = time + "," + number + "," + hours + "," + temp + "," + visibility + "," + description;
+              weather_prediction.innerHTML += "<option>" + datetime + "</option>"
+              document.getElementById("weather_tr").innerHTML = ''
+              document.getElementById("weather_tr").innerHTML += '<td><img src=' + icon +
+                ' style = \"float: left;margin-left: 15px;\"></td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+description+'</td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+temp+'°C </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+humidity+'% </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+visibility+'m </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+datetime+'</td>';
+          }
+      })
+
+
       
-
-
-
-
-
-
     </script>
 
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -170,7 +211,6 @@
               google.charts.load('current', {'packages':['corechart']});
               google.charts.setOnLoadCallback(()=>{
               drawChart(id)
-
               });
             }
             
@@ -187,18 +227,18 @@
                   temp = [timestamp4,parseInt(avai_bikes[i]['available_bikes']),parseInt(avai_bikes[i]['available_bike_stands'])];
                   chart_array.unshift(temp)
                 }
-                extra = "<p>Station ID: " + id +  "</p>";
+                extra = "<p>Past chart and Prediction chart of Station ID: " + id +  "</p>";
                 document.getElementById("extraStationInfo").innerHTML = extra;
               
                 // console.log(chart_array);
                 var dataC = new google.visualization.DataTable();
                 dataC.addColumn('date', 'time');
-                dataC.addColumn('number', 'available_bikes');
-                dataC.addColumn('number', 'available_bike_stands');
+                dataC.addColumn('number', 'bikes');
+                dataC.addColumn('number', 'bike_stands');
                 dataC.addRows(chart_array);
                 var options = {
-                    title: 'available bikes and stands in this station',
-                    width: 900,
+                    title: 'available bikes and stands in Past 3 hours chart',
+                    width: 700,
                     height: 500,
                     hAxis: {
                       // format: 'M/d/yy',
@@ -211,6 +251,8 @@
                 };
                 var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
                 chart.draw(dataC, options);
+
+
               
             })
 
@@ -231,40 +273,100 @@
             }
 
             // myPrediction(prediction_info_list);
-
+            
             // Trigger ML model and display result on HTML
-            function post_info(id){
+            function post_info(id,bike_stands){
+              var pre_res = []
+              var final_prediction = {}
+              var prediction_info_lists = []
               var jqweather_predict = $.getJSON("https://api.openweathermap.org/data/2.5/onecall?lat=53.343897&lon=-6.278198&exclude=minutely,daily,current,alerts&appid=2150ca8b3c3f0f799010b1403ca77a5d", function(data){
                 weather_predict_list = data["hourly"]
                 for(var i = 0; i < weather_predict_list.length; i ++){
-                  var time = new Date(parseInt(weather_predict_list[i].dt)*1000).getDay() + 1;
-                  var number = id
-                  var hours = new Date(parseInt(weather_predict_list[i].dt)*1000).getHours()
-                  var temp = weather_predict_list[i]["temp"]
-                  var visibility = weather_predict_list[i]["visibility"]
-                  var description = weather_predict_list[i]["weather"][0]["description"]
-                  console.log(id,time,hours,temp,visibility,description);
-                  prediction_info_list = time + "," + number + "," + hours + "," + temp + "," + visibility + "," + description;
-                  myPrediction(prediction_info_list);
+                    var datetime = new Date(parseInt(weather_predict_list[i].dt)*1000)
+                    var time = datetime.getDay() + 1;
+                    var number = id
+                    var hours = datetime.getHours()
+                    var temp = weather_predict_list[i]["temp"]
+                    var visibility = weather_predict_list[i]["visibility"]
+                    var description = weather_predict_list[i]["weather"][0]["description"]
+                    // console.log(id,time,hours,temp,visibility,description);
+                    prediction_info_list = time + "," + number + "," + hours + "," + temp + "," + visibility + "," + description;
+                    prediction_info_lists.push(prediction_info_list)   
+                    myPrediction(prediction_info_list,bike_stands,pre_res,datetime)   
                 }
               })
             }
+            function myPrediction(prediction_info_list,bike_stands,pre_res,datetime) {
+                $.getJSON($SCRIPT_ROOT + '/prediction_model', {post: prediction_info_list}, function(data) {
+                  var response = data;
+                  var pre_bikes = response[0];
+                  var stands = bike_stands - pre_bikes
+                  pre_res.push([datetime,pre_bikes,stands])
+                  // document.getElementById("prediction_title").innerHTML = "<h2>this station Predict bikes and stands</h2>"
+                  // document.getElementById("prediction_bikes_stands").innerHTML = "<h3>bikes:"+pre_bikes+"</h3>"+"<h3>stands:"+stands+"</h3>"
+                }).then(()=>{
+                  //输入函数体
+                  console.log(pre_res);
+                  if(pre_res.length == 48){
+                    let sorted_res = pre_res.sort((a,b)=>{
+                      return a[0] > b[0]?1:-1
+                    })
+                    pre_res = []
 
-            function myPrediction(prediction_info_list) {
-              $.getJSON($SCRIPT_ROOT + '/prediction_model', {post: prediction_info_list}, function(data) {
-                console.log(data);
-                // var response = data;
-                // var bikes = response[0];
-                // var stands = response[1];
-                // document.getElementById("prediction_title").innerHTML = "<h2>this station Predict bikes and stands</h2>"
-                // document.getElementById("prediction_bikes_stands").innerHTML = "<h3>bikes:"+bikes+"</h3>"+"<h3>stands:"+stands+"</h3>"
-                // document.getElementById("sourceTitle").innerHTML="Nearest stations to your source<br><span class='availableBrackets'>(Predicted available bikes)</span>";
-                // document.getElementById("sourceList").innerHTML="<span onclick=\"clickMarker('"+nearest_station+"')\">"+nearest_station+"</span> ("+bike_nearest_station+")<br><span onclick=\"clickMarker('"+second_nearest_station+"')\">"+second_nearest_station+"</span> ("+bike_available_2nd_nearest+")";
-              });
+                    google.charts.load('current', {'packages':['corechart']});
+                    google.charts.setOnLoadCallback(()=>{
+                      var dataP = new google.visualization.DataTable();
+                      dataP.addColumn('date', 'time');
+                      dataP.addColumn('number', 'bikes');
+                      dataP.addColumn('number', 'bike_stands');
+                      dataP.addRows(sorted_res);
+                      var options = {
+                          title: 'prediction of available bikes and stands in next 48 hours chart',
+                          width: 900,
+                          height: 500,
+                          hAxis: {
+                            format: 'hh:mm:ss',
+                            gridlines: {count: 48}
+                          },
+                          vAxis: {
+                            gridlines: {color: 'none'},
+                            minValue: 0
+                          }
+                      };
+                      var predict_chart = document.getElementById('predict_chart')
+                      predict_chart.innerHTML = ''
+                      var chart = new google.visualization.LineChart(predict_chart);
+                      chart.draw(dataP, options);
+                    });
+                    
+                  }
+                })
+
             };
 
-
-
+            function selectChange(){
+              var objS = document.getElementById("weather_prediction")
+              var time = objS.options[objS.selectedIndex].text
+              var i = objS.selectedIndex
+              var datetime = new Date(parseInt(weather_predict_list[i].dt)*1000)
+              // var number = id
+              
+              var temp = (parseInt(weather_predict_list[i]["temp"]) - 273.15).toFixed(2);
+              var visibility = weather_predict_list[i]["visibility"]
+              var description = weather_predict_list[i]["weather"][0]["description"]
+              var humidity = weather_predict_list[i]["humidity"]
+              var icon = "http://openweathermap.org/img/w/" + weather_predict_list[i]["weather"][0]["icon"] + ".png";
+              // console.log(id,time,hours,temp,visibility,description);
+              // prediction_info_list = time + "," + number + "," + hours + "," + temp + "," + visibility + "," + description;
+              document.getElementById("weather_tr").innerHTML = ''
+              document.getElementById("weather_tr").innerHTML += '<td><img src=' + icon +
+                ' style = \"float: left;margin-left: 15px;\"></td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+description+'</td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+temp+'°C </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+humidity+'% </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+visibility+'m </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+datetime+'</td>';
+            }
             
     </script>
 
