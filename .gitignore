@@ -14,8 +14,7 @@
 /Database/data
 #key
 keys.py
-final_prediction_bike_stands.pickle
-final_prediction.pickle
+*.pickle
 
 # misc
 .DS_Store
