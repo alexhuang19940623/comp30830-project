@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Dublinbikes</title>
+
+    <style type="text/css">
+      /* Set the size of the div element that contains the map */
+      #map {
+        height: 400px;
+        /* The height is 400 pixels */
+        width: 100%;
+        /* The width is the width of the web page */
+      }
+    </style>
+    <script>
+      const key = "###"
+        function initMap() {
+            new Promise((resolve, reject)=>{
+                url = "https://api.jcdecaux.com/vls/v1/stations?apiKey="+key+"&contract=Dublin"
+                myRequest = new XMLHttpRequest();
+                myRequest.open('GET', url, true);
+                myRequest.send();
+                myRequest.onreadystatechange = ()=>{
+                    if (myRequest.readyState == 4 && myRequest.status == 200){
+                        var myjson = myRequest.responseText
+                        var bikes = JSON.parse(myjson)
+                        resolve(bikes)
+                    }
+                }
+            }).then((bikes)=>{
+                console.log(bikes);
+                // The location of Dublin
+                const center = { lat: 53.349562, lng: -6.278198 };
+                // The map, centered at Dublin
+                const map = new google.maps.Map(document.getElementById("map"), {
+                  zoom: 13,
+                  center: center,
+                });
+                // The marker, positioned at Dublin
+                marks=[];
+                for(var i = 0; i < bikes.length;i++){
+                    const marker = new google.maps.Marker({
+                        position: bikes[i]['position'],
+                        map: map,
+                    });
+                    marks.unshift(marker);
+                  }
+            })
+        }
+    </script>
+  </head>
+  <body>
+    <h3>DublinBike Demo</h3>
+    <!--The div element for the map -->
+    <div id="map"></div>
+
+    <!-- Async script executes immediately and must be after any DOM elements used in callback. -->
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key=#####&callback=initMap&libraries=&v=weekly";
+      async
+    ></script>
+  </body>
+</html>
