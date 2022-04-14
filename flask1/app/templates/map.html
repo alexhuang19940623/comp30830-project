@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="/static/main.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  </head>
+  <body>
+    <div id="bg">
+      <div id="header">
+        <h1 id="name">Real-time Dublin Bike Information</h1>
+        <a href = "http://www.dublinbikes.ie/" target="_blank"><img src="https://vignette.wikia.nocookie.net/logopedia/images/7/74/Dublinbikes.svg/revision/latest?cb=20140625224430" style="width:100px;height:55px;position:absolute;right:20%;top:0px;"></a>
+      </div>  
+      <div id="weatherDiv">
+        <table id="weather_tb">
+          <caption>Weather prediction table</caption>
+          <th></th>
+          <th>Description</th>
+          <th>Temperture</th>
+          <th>Humidity</th>
+          <th>Visibility</th>
+          <th>Time</th>
+          <tr id="weather_tr"></tr>
+        </table>
+        <span style="font-size: larger;">Weather prediction in next 48 hours: </span>
+        <select id="weather_prediction" onchange="selectChange()" style="display: inline-block;"></select>
+      </div>
+      <div id="heatmap">
+        <!-- <span style="position: absolute;left: 2%; font-size: larger;">heatmap on/off: </span> -->
+        <button id="toggle-heatmap" class="green">heatmap</button>
+      </div>
+  
+      <div id="map"></div>
+      <div id="chart">
+        <h3 id="extraStationInfo">Click the marker on the map, it will show Past infomation and Prediction infomation Chart </h3>
+        <div id="curve_chart" style="float:left"></div>
+        <div id="predict_chart" style="float: left;"></div>
+      </div>
+    </div>
+    <!--The div element for the map -->
+    
+    <script type="text/javascript">
+
+      var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+
+    </script>
+    <script>
+      infoArray = []
+      function initMap() {
+          var jqxhr_station = $.getJSON($SCRIPT_ROOT + "/station", function(data) {
+              var bikes = data.stations;
+                  // console.log(bikes);
+                  // The location of Dublin
+                  const center = { lat: 53.349562, lng: -6.278198 };
+                  // The map, centered at Dublin
+                  const map = new google.maps.Map(document.getElementById("map"), {
+                      zoom: 13,
+                      center: center,
+                  });
+                  Locations = {}
+                  for(var i = 0; i < bikes.length;i++){
+                    l = [bikes[i]['position_lat'], bikes[i]['position_lng']];
+                    Locations[bikes[i]['number']] = l;
+                  }
+                  // console.log(Locations);
+                  var xhr = $.getJSON($SCRIPT_ROOT + "/now_available", function(data) {
+                    res = [];
+                    var a_bikes = data.available;
+                    // console.log(a_bikes);
+                    a_bikes.forEach(element => {
+                      id = element['number']
+                      temp = element['available_bikes'];
+                      res.push(
+                        {
+                          location: new google.maps.LatLng(Locations[id][0], Locations[id][1]),
+                          weight: temp
+                        }
+                      )
+                    });
+                    const heatmap = new google.maps.visualization.HeatmapLayer({
+                      data: getPoints(),
+                      map: map,
+                    });
+                    heatmap.set('radius', 40);
+                    document
+                    .getElementById("toggle-heatmap")
+                    .addEventListener("click", toggleHeatmap);
+                    function toggleHeatmap() {
+                      heatmap.setMap(heatmap.getMap() ? null : map);
+                    }
+                    function getPoints(){
+                      return res; 
+                    };
+                  }).fail(()=>{
+                    //输入函数体
+                    console.log("failed!");
+                  })
+                  // The marker, positioned at Dublin
+                  marks=[];
+                  for(var i = 0; i < bikes.length;i++){
+                      // console.log(bikes[i]);
+                      const marker = new google.maps.Marker({
+                          position: {lat: bikes[i]['position_lat'], lng: bikes[i]['position_lng']},
+                          map: map,
+                          title : bikes[i]['name'],
+                          station_number : bikes[i]['number'],
+                          status: bikes[i]['status'],
+                          icon: "/static/bikeicon.png",
+                          bike_stands: bikes[i]['bike_stands']
+                      });
+                      marks.unshift(marker);
+                      //When a marker is clicked, close the other infowindow before opening the new one
+                      google.maps.event.addListener(marker, 'click', function() {
+                          post_info(marker.station_number,marker.bike_stands);
+                          showChart(marker.station_number)
+                          for (var i=0;i<infoArray.length;i++) {
+                              infoArray[i].close();
+                          }
+                          var infowindow = new google.maps.InfoWindow();
+                          infoArray.push(infowindow);
+                          var jqxhr_avail = $.getJSON($SCRIPT_ROOT + "/available/" + marker.station_number, function(data) {
+                              var avai_bikes = data.available;
+                              
+                              times_Str = []
+                              chart_array = []
+                              for(var i = 0; i < avai_bikes.length; i ++){
+                                // time string
+                                var timestamp4 = new Date(parseInt(avai_bikes[i]['last_update']))
+                                let time_Str=timestamp4.getFullYear() + '-' + (timestamp4.getMonth() + 1) + '-' + timestamp4.getDate() + ' ' + 
+                                timestamp4.getHours() + ':' + 
+                                timestamp4.getMinutes() + ':' + 
+                                timestamp4.getSeconds();
+                                times_Str.unshift(time_Str);
+                                // chart string
+                                temp = [timestamp4.getHours() + ':' + timestamp4.getMinutes(), avai_bikes[i]['available_bikes'], avai_bikes[i]['available_bike_stands']];
+                                chart_array.unshift(temp)
+                              }
+                              times_Str.reverse();
+                              // console.log(times_Str);
+                              // console.log(avai_bikes);
+                              /* Creates information box including bike and stand availability with the option for more info. The more info button will display a graph of the average occupancy for that station for the current day. For example if the web page is loaded on a monday, all info buttons will return plot a graph of the average occupancy for a full monday. The realtime data is updated every 5 minutes to ensure the user sees regularly up to date info.*/
+                              contentString = '<div id = "content"><h3>' + marker.title + '</h3></div>' + 
+                              '<div id="station_availability"><h3>Bikes available: ' 
+                                + avai_bikes[0]['available_bikes'] + "<br> Status: "
+                                + marker.status+ '<br> Stands available: ' 
+                                + avai_bikes[0]['available_bike_stands'] + '<br> Last update time: '
+                                + times_Str[0]+'</h3></div>';
+                              infowindow.setContent(contentString);
+                              infowindow.open(map, marker);
+                          })
+                      });
+                }
+          })
+        }
+      var jqweather = $.getJSON($SCRIPT_ROOT + "/weather", function(data) {
+              weather = data["weather"][0];
+              console.log(weather);
+              var description = weather.description;
+              var last_up = new Date(parseInt(weather.dt)*1000);
+              var time = new Date(Date.now())
+              var humidity = weather.humidity;
+              var temperture = (parseInt(weather.temperture) - 273.15).toFixed(2);
+              var visibility = weather.visibility;
+              var icon = "http://openweathermap.org/img/w/" + weather.icon + ".png";
+              document.getElementById("weather_tr").innerHTML = ''
+              document.getElementById("weather_tr").innerHTML += '<td><img src=' + icon +
+                ' style = \"float: left;margin-left: 15px;\"></td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+description+'</td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+temperture+'°C </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+humidity+'% </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+visibility+'m </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+last_up+'</td>';
+      })
+
+
+
+
+      var jqweather_predict = $.getJSON("https://api.openweathermap.org/data/2.5/onecall?lat=53.343897&lon=-6.278198&exclude=minutely,daily,current,alerts&appid=2150ca8b3c3f0f799010b1403ca77a5d", function(data){
+          weather_predict_list = data["hourly"]
+          var weather_prediction_div = document.getElementById("weather_prediction");
+          for(var i = 0; i < weather_predict_list.length; i ++){
+              var datetime = new Date(parseInt(weather_predict_list[i].dt)*1000)
+              var time = datetime.getDay() + 1;
+              // var number = id
+              var hours = datetime.getHours()
+              var temp = weather_predict_list[i]["temp"]
+              var visibility = weather_predict_list[i]["visibility"]
+              var description = weather_predict_list[i]["weather"][0]["description"]
+              var humidity = weather_predict_list[i]["humidity"]
+              var icon = "http://openweathermap.org/img/w/" + weather_predict_list[i]["weather"][0]["icon"] + ".png";
+              // console.log(id,time,hours,temp,visibility,description);
+              // prediction_info_list = time + "," + number + "," + hours + "," + temp + "," + visibility + "," + description;
+              weather_prediction.innerHTML += "<option>" + datetime + "</option>"
+              document.getElementById("weather_tr").innerHTML = ''
+              document.getElementById("weather_tr").innerHTML += '<td><img src=' + icon +
+                ' style = \"float: left;margin-left: 15px;\"></td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+description+'</td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+temp+'°C </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+humidity+'% </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+visibility+'m </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+datetime+'</td>';
+          }
+      })
+
+
+      
+    </script>
+
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+            function showChart(id){
+              google.charts.load('current', {'packages':['corechart']});
+              google.charts.setOnLoadCallback(()=>{
+              drawChart(id)
+              });
+            }
+            
+            function drawChart(id) {
+
+              var jqxhr_avail = $.getJSON($SCRIPT_ROOT + "/available/" + id, function(json) {
+
+                var avai_bikes = json.available;
+                chart_array = [];
+                for(var i = 0; i < avai_bikes.length; i ++){
+                  // chart string
+                  var timestamp4 = new Date(parseInt(avai_bikes[i]['last_update']))
+                  // let s = timestamp4.getHours +':'+timestamp4.getMinutes;
+                  temp = [timestamp4,parseInt(avai_bikes[i]['available_bikes']),parseInt(avai_bikes[i]['available_bike_stands'])];
+                  chart_array.unshift(temp)
+                }
+                extra = "<p>Past chart and Prediction chart of Station ID: " + id +  "</p>";
+                document.getElementById("extraStationInfo").innerHTML = extra;
+              
+                // console.log(chart_array);
+                var dataC = new google.visualization.DataTable();
+                dataC.addColumn('date', 'time');
+                dataC.addColumn('number', 'bikes');
+                dataC.addColumn('number', 'bike_stands');
+                dataC.addRows(chart_array);
+                var options = {
+                    title: 'available bikes and stands in Past 3 hours chart',
+                    width: 700,
+                    height: 500,
+                    hAxis: {
+                      // format: 'M/d/yy',
+                      gridlines: {count: 24}
+                    },
+                    vAxis: {
+                      gridlines: {color: 'none'},
+                      minValue: 0
+                    }
+                };
+                var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
+                chart.draw(dataC, options);
+
+
+              
+            })
+
+            
+          }
+
+            function show_weather(weather){
+              // console.log(weather);
+              var weatherInfo = weather[0];
+              var time = new Date(parseInt(weather.dt));
+              var humidity = weather.humidity;
+              var temperture = parseInt(weather.temperture) - 273.15;
+              var visibility = weather.visibility;
+              var icon = "http://openweathermap.org/img/w/" + weather.icon + ".png";
+              document.getElementById("weatherDiv").innerHTML = "<h2>" + time + "</h2><div id = \"icon\"><img src=" + icon +
+                " style = \"float: left;margin-left: 15px;\">" + weatherInfo +"</div><div id = \"temp\"><br/><b>Temperture: </b>" + temperture + 
+                  "°C<br/></div></div>";
+            }
+
+            // myPrediction(prediction_info_list);
+            
+            // Trigger ML model and display result on HTML
+            function post_info(id,bike_stands){
+              var pre_res = []
+              var final_prediction = {}
+              var prediction_info_lists = []
+              var jqweather_predict = $.getJSON("https://api.openweathermap.org/data/2.5/onecall?lat=53.343897&lon=-6.278198&exclude=minutely,daily,current,alerts&appid=2150ca8b3c3f0f799010b1403ca77a5d", function(data){
+                weather_predict_list = data["hourly"]
+                for(var i = 0; i < weather_predict_list.length; i ++){
+                    var datetime = new Date(parseInt(weather_predict_list[i].dt)*1000)
+                    var time = datetime.getDay() + 1;
+                    var number = id
+                    var hours = datetime.getHours()
+                    var temp = weather_predict_list[i]["temp"]
+                    var visibility = weather_predict_list[i]["visibility"]
+                    var description = weather_predict_list[i]["weather"][0]["description"]
+                    // console.log(id,time,hours,temp,visibility,description);
+                    prediction_info_list = time + "," + number + "," + hours + "," + temp + "," + visibility + "," + description;
+                    prediction_info_lists.push(prediction_info_list)   
+                    myPrediction(prediction_info_list,bike_stands,pre_res,datetime)   
+                }
+              })
+            }
+            function myPrediction(prediction_info_list,bike_stands,pre_res,datetime) {
+                $.getJSON($SCRIPT_ROOT + '/prediction_model', {post: prediction_info_list}, function(data) {
+                  var response = data;
+                  var pre_bikes = response[0];
+                  var stands = bike_stands - pre_bikes
+                  pre_res.push([datetime,pre_bikes,stands])
+                  // document.getElementById("prediction_title").innerHTML = "<h2>this station Predict bikes and stands</h2>"
+                  // document.getElementById("prediction_bikes_stands").innerHTML = "<h3>bikes:"+pre_bikes+"</h3>"+"<h3>stands:"+stands+"</h3>"
+                }).then(()=>{
+                  //输入函数体
+                  console.log(pre_res);
+                  if(pre_res.length == 48){
+                    let sorted_res = pre_res.sort((a,b)=>{
+                      return a[0] > b[0]?1:-1
+                    })
+                    pre_res = []
+
+                    google.charts.load('current', {'packages':['corechart']});
+                    google.charts.setOnLoadCallback(()=>{
+                      var dataP = new google.visualization.DataTable();
+                      dataP.addColumn('date', 'time');
+                      dataP.addColumn('number', 'bikes');
+                      dataP.addColumn('number', 'bike_stands');
+                      dataP.addRows(sorted_res);
+                      var options = {
+                          title: 'prediction of available bikes and stands in next 48 hours chart',
+                          width: 900,
+                          height: 500,
+                          hAxis: {
+                            format: 'hh:mm:ss',
+                            gridlines: {count: 48}
+                          },
+                          vAxis: {
+                            gridlines: {color: 'none'},
+                            minValue: 0
+                          }
+                      };
+                      var predict_chart = document.getElementById('predict_chart')
+                      predict_chart.innerHTML = ''
+                      var chart = new google.visualization.LineChart(predict_chart);
+                      chart.draw(dataP, options);
+                    });
+                    
+                  }
+                })
+
+            };
+
+            function selectChange(){
+              var objS = document.getElementById("weather_prediction")
+              var time = objS.options[objS.selectedIndex].text
+              var i = objS.selectedIndex
+              var datetime = new Date(parseInt(weather_predict_list[i].dt)*1000)
+              // var number = id
+              
+              var temp = (parseInt(weather_predict_list[i]["temp"]) - 273.15).toFixed(2);
+              var visibility = weather_predict_list[i]["visibility"]
+              var description = weather_predict_list[i]["weather"][0]["description"]
+              var humidity = weather_predict_list[i]["humidity"]
+              var icon = "http://openweathermap.org/img/w/" + weather_predict_list[i]["weather"][0]["icon"] + ".png";
+              // console.log(id,time,hours,temp,visibility,description);
+              // prediction_info_list = time + "," + number + "," + hours + "," + temp + "," + visibility + "," + description;
+              document.getElementById("weather_tr").innerHTML = ''
+              document.getElementById("weather_tr").innerHTML += '<td><img src=' + icon +
+                ' style = \"float: left;margin-left: 15px;\"></td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+description+'</td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+temp+'°C </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+humidity+'% </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+visibility+'m </td>';
+              document.getElementById("weather_tr").innerHTML += '<td>'+datetime+'</td>';
+            }
+            
+    </script>
+
+    <!-- Async script executes immediately and must be after any DOM elements used in callback.-->
+    <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAWssQsDRSjIdTwIHqpC18ToY4GzOis85Q&callback=initMap&libraries=visualization&v=weekly";
+      async
+    ></script>
+  </body>
+</html>

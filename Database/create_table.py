@@ -54,3 +54,23 @@ try:
     print(res.fetchall())
 except Exception as e:
     print(e)
+
+sql1 = """
+use dbikes;
+
+"""
+sql2 = """
+    CREATE TABLE IF NOT EXISTS availability(
+        number INTEGER,
+        available_bikes INTEGER,
+        available_bike_stands INTEGER,
+        last_update INTEGER
+	);
+"""
+try:
+    res = engine.execute(sql1)
+    res = engine.execute("DROP TABLE IF EXISTS availability")
+    res = engine.execute(sql2)
+    print(res.fetchall())
+except Exception as e:
+    print(e)
